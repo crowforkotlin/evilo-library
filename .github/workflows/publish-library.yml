@@ -1,0 +1,166 @@
+name: Publish evilo library
+
+# Publishes io.github.crowforkotlin.evilo:evilo-library to Maven Central.
+# The version in gradle.properties is the protocol contract that plugin
+# repositories compile against. Every release raises it: an unchanged version is
+# already on Central, and republishing it would either fail or waste quota.
+on:
+  push:
+    tags: ['library-v*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and stage the deployment without uploading it
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-library
+  cancel-in-progress: false
+
+env:
+  # Read once so the tag check, the Central probe, and the staged-artifact paths
+  # cannot drift from the build file.
+  EVILO_GROUP: ${{ vars.EVILO_GROUP || 'io.github.crowforkotlin.evilo' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      skip: ${{ steps.published.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Read the version and check it against the tag
+        id: version
+        run: |
+          version=$(sed -n 's/^EVILO_LIBRARY_VERSION_NAME=\(.*\)$/\1/p' gradle.properties)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid EVILO_LIBRARY_VERSION_NAME: '$version'"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            [[ "$GITHUB_REF_NAME" == "library-v$version" ]] || {
+              echo "Tag $GITHUB_REF_NAME does not match library-v$version."; exit 1; }
+          fi
+          # The published POM must agree with the group the workflow probes.
+          declared=$(sed -n 's/^group = "\(.*\)"$/\1/p' build.gradle.kts)
+          [[ "$declared" == "$EVILO_GROUP" ]] || {
+            echo "build.gradle.kts group '$declared' does not match EVILO_GROUP '$EVILO_GROUP'."; exit 1; }
+          echo "SDK $version ($EVILO_GROUP)"
+
+      - name: Decide whether this version has anything to publish
+        id: published
+        run: |
+          version='${{ steps.version.outputs.version }}'
+          path="${EVILO_GROUP//.//}"
+          url="https://repo1.maven.org/maven2/$path/evilo-library/$version/evilo-library-$version.pom"
+          status=$(curl -s -o /dev/null -w '%{http_code}' "$url")
+          if [[ "$status" == "200" ]]; then
+            echo "evilo-library $version is already on Maven Central; nothing to publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the portable tests
+        if: ${{ steps.published.outputs.skip != 'true' }}
+        # jvmTest covers the models and protocol rules. The js/wasmJs suites need a
+        # browser, and the WASI test binary cannot be instantiated by current Node.
+        run: ./gradlew :jvmTest --no-daemon --no-configuration-cache
+
+      - name: Stage the publication locally
+        if: ${{ steps.published.outputs.skip != 'true' }}
+        run: |
+          ./gradlew publishToMavenLocal --no-daemon --no-configuration-cache --no-build-cache
+          version='${{ steps.version.outputs.version }}'
+          staged="$HOME/.m2/repository/${EVILO_GROUP//.//}"
+          for artifact in \
+            evilo-library evilo-library-jvm evilo-library-android \
+            evilo-library-wasm-wasi evilo-library-wasm-js \
+            evilo-library-js evilo-library-iosarm64 evilo-library-iossimulatorarm64; do
+            pom="$staged/$artifact/$version/$artifact-$version.pom"
+            test -f "$pom" || { echo "Missing staged POM: $pom"; exit 1; }
+            grep -q '<license>' "$pom" || { echo "Missing license metadata in $pom"; exit 1; }
+            grep -q '<scm>' "$pom" || { echo "Missing scm metadata in $pom"; exit 1; }
+            test -f "$staged/$artifact/$version/$artifact-$version-sources.jar" \
+              || { echo "Missing sources for $artifact"; exit 1; }
+            test -f "$staged/$artifact/$version/$artifact-$version-javadoc.jar" \
+              || { echo "Missing javadoc for $artifact"; exit 1; }
+          done
+
+      - name: Check the publication footprint
+        if: ${{ steps.published.outputs.skip != 'true' }}
+        # Central's free tier meters monthly bytes and file counts for the whole
+        # organisation. Fail early instead of discovering the limit during upload.
+        run: |
+          version='${{ steps.version.outputs.version }}'
+          # Only this release's coordinates: the shared local repository also holds
+          # unrelated artifacts and must not affect the measurement.
+          staged="$HOME/.m2/repository/${EVILO_GROUP//.//}"
+          total=0
+          files=0
+          while IFS= read -r -d '' file; do
+            total=$(( total + $(stat -c %s "$file") ))
+            files=$(( files + 1 ))
+          done < <(find "$staged" -path "*/$version/*" -type f -print0)
+          echo "staged: $files files, $(( total / 1024 )) KiB"
+          (( files > 0 )) || { echo "Nothing staged under $staged."; exit 1; }
+          (( total < 8 * 1024 * 1024 )) || { echo "Publication exceeds 8 MiB; trim targets or artifacts."; exit 1; }
+          (( files < 60 )) || { echo "Publication exceeds 60 files; trim targets or artifacts."; exit 1; }
+
+  publish:
+    needs: verify
+    # A tag publishes only when that version is new; re-running an existing
+    # version stops after verify instead of failing.
+    if: ${{ !inputs.dry_run && needs.verify.outputs.skip != 'true' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Publish to Maven Central
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.MAVEN_CENTRAL_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.MAVEN_CENTRAL_SIGNING_KEY_PASSWORD }}
+        run: |
+          test -n "$ORG_GRADLE_PROJECT_mavenCentralUsername" || { echo 'Configure MAVEN_CENTRAL_USERNAME.'; exit 1; }
+          test -n "$ORG_GRADLE_PROJECT_mavenCentralPassword" || { echo 'Configure MAVEN_CENTRAL_PASSWORD.'; exit 1; }
+          test -n "$ORG_GRADLE_PROJECT_signingInMemoryKey" || { echo 'Configure MAVEN_CENTRAL_SIGNING_KEY.'; exit 1; }
+          # The Kotlin signing tasks cannot be serialized into the configuration cache.
+          ./gradlew publishToMavenCentral \
+            --no-daemon --no-configuration-cache --no-build-cache
+
+      - name: Report the published coordinates
+        if: ${{ success() }}
+        run: |
+          version='${{ needs.verify.outputs.version }}'
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          Published \`$EVILO_GROUP:evilo-library:$version\`.
+
+          Central processing is asynchronous. Check the deployment status and
+          https://repo1.maven.org/maven2/${EVILO_GROUP//.//}/evilo-library/$version/
+          before updating consumers.
+          EOF
