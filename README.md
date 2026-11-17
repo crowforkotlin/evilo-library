@@ -82,8 +82,19 @@ plus sources and javadoc JARs, gates the footprint (the free Central tier meters
 monthly bytes and file counts), and only then uploads with
 `publishToMavenCentral`.
 
-Required repository secrets: `MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`,
-`MAVEN_CENTRAL_SIGNING_KEY`, `MAVEN_CENTRAL_SIGNING_KEY_PASSWORD`.
+Required repository secrets, set once:
+
+```sh
+./.github/scripts/setup_central_secrets.sh --from-key 0B4189D9794C625F
+```
+
+Run it from a terminal, not through a pipe: it prompts once per value and does
+not echo them. `--from-key` exports the signing key straight from your local
+GnuPG keyring so the armored key never passes through a paste buffer.
+
+Do not loop `gh secret set NAME` without `--body`: each call opens its own
+interactive prompt on the same terminal, so a `for` loop delivers values to the
+wrong secrets or hangs.
 
 A version already on Central is skipped rather than republished, so re-running a
 tag is harmless. Verify a release with:
