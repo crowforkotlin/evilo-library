@@ -82,25 +82,33 @@ plus sources and javadoc JARs, gates the footprint (the free Central tier meters
 monthly bytes and file counts), and only then uploads with
 `publishToMavenCentral`.
 
-Required repository secrets, set once:
+Required repository secrets, set once. Run these one at a time and paste the
+value at the prompt; `gh secret set` reads a single value per command, so putting
+it in a `for` loop makes every iteration fight the same terminal.
 
 ```sh
-./.github/scripts/setup_central_secrets.sh --from-key 0B4189D9794C625F
+gh secret set MAVEN_CENTRAL_USERNAME --repo crowforkotlin/evilo-library
+gh secret set MAVEN_CENTRAL_PASSWORD --repo crowforkotlin/evilo-library
+gh secret set MAVEN_CENTRAL_SIGNING_KEY_PASSWORD --repo crowforkotlin/evilo-library
 ```
 
-Run it from a terminal, not through a pipe: it prompts once per value and does
-not echo them. `--from-key` exports the signing key straight from your local
-GnuPG keyring so the armored key never passes through a paste buffer.
-
-Do not loop `gh secret set NAME` without `--body`: each call opens its own
-interactive prompt on the same terminal, so a `for` loop delivers values to the
-wrong secrets or hangs.
-
-A version already on Central is skipped rather than republished, so re-running a
-tag is harmless. Verify a release with:
+Both halves of the Central user token come from Portal -> Account -> Generate
+User Token. For the signing key, export it from your keyring directly so the
+armored key never passes through a paste buffer:
 
 ```sh
-curl -sI https://repo1.maven.org/maven2/io/github/crowforkotlin/evilo/evilo-library/1.0.1/evilo-library-1.0.1.pom | head -1
+GNUPGHOME="$HOME/.gnupg" gpg --armor --export-secret-keys 0B4189D9794C625F \
+  | gh secret set MAVEN_CENTRAL_SIGNING_KEY --repo crowforkotlin/evilo-library
+```
+
+`gnupg` may ask for the key passphrase while exporting. If you omit
+`GNUPGHOME`, an inherited `GNUPGHOME` pointing at a missing directory makes `gpg`
+fail before it reaches your keyring.
+
+Confirm all four are present:
+
+```sh
+gh secret list --repo crowforkotlin/evilo-library
 ```
 
 ## License
