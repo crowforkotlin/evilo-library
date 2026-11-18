@@ -1,8 +1,8 @@
 # evilo-library
 
-The Kotlin Multiplatform SDK for [evilo](https://github.com/crowforkotlin/evilo) plugins:
-portable media models, the synchronous plugin/host protocol, and the Wasmline
-service interfaces a plugin implements.
+The Kotlin Multiplatform SDK for evilo plugins: portable media models, the
+synchronous plugin/host protocol, and the Wasmline service interfaces a plugin
+implements.
 
 Published to Maven Central as `io.github.crowforkotlin.evilo:evilo-library`.
 
