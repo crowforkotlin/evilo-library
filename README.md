@@ -8,7 +8,7 @@ Published to Maven Central as `io.github.crowforkotlin.evilo:evilo-library`.
 
 ```kotlin
 dependencies {
-    api("io.github.crowforkotlin.evilo:evilo-library:1.0.0")
+    api("io.github.crowforkotlin.evilo:evilo-library:2.0.0")
 }
 ```
 
@@ -23,7 +23,7 @@ dependencies {
 | Package | Purpose |
 | --- | --- |
 | `crow.evilo.model` | Serializable media models: items, chapters, pages, streams |
-| `crow.evilo.plugin.api` | `EviloPluginService`, `EviloHostService`, `MangaSourceService`, descriptors, permissions, and protocol compatibility rules |
+| `crow.evilo.plugin.api` | `EviloPluginService`, `EviloHostService`, `MangaSourceService`, descriptors, storage and HTTP contracts, and protocol compatibility rules |
 
 The protocol is JSON envelopes over generated Wasmline bridge calls, so additive
 fields stay independent of the bridge ABI. Unknown optional fields are tolerated;
@@ -58,11 +58,11 @@ Use the script rather than editing by hand:
 repository secrets. Consumers can then resolve the coordinate without a composite
 build.
 
-To develop a plugin against uncommitted SDK changes, point the plugin repository
-at this directory instead of a published version:
+To develop a plugin against uncommitted SDK changes, publish it locally and
+build the plugin repository with its own local-SDK switch:
 
 ```sh
-./gradlew :evilo-plugin-core:jvmTest -Pevilo.sdkPath=../evilo-library
+./gradlew publishToMavenLocal
 ```
 
 ## Releasing
