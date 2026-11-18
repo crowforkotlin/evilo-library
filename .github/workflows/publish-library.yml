@@ -149,13 +149,21 @@ jobs:
           test -n "$ORG_GRADLE_PROJECT_mavenCentralUsername" || { echo 'Configure MAVEN_CENTRAL_USERNAME.'; exit 1; }
           test -n "$ORG_GRADLE_PROJECT_mavenCentralPassword" || { echo 'Configure MAVEN_CENTRAL_PASSWORD.'; exit 1; }
           test -n "$ORG_GRADLE_PROJECT_signingInMemoryKey" || { echo 'Configure MAVEN_CENTRAL_SIGNING_KEY.'; exit 1; }
-          # A passphrase-protected key without its secret fails deep inside BouncyCastle
-          # as "checksum mismatch in checksum of 20 bytes", which reads like corruption.
-          # This repository's key has a passphrase, so require a non-empty value here.
-          # Note an unset Actions secret still arrives as an empty variable, so `-n` is
-          # the only test that catches it; `${VAR+set}` would pass.
-          test -n "$ORG_GRADLE_PROJECT_signingInMemoryKeyPassword" || {
-            echo 'Configure MAVEN_CENTRAL_SIGNING_KEY_PASSWORD.'; exit 1; }
+          # A passphrase-protected key with an empty password fails deep inside
+          # BouncyCastle as "checksum mismatch in checksum of 20 bytes", which reads
+          # like corruption. Inspect the armored key instead of assuming: an
+          # unprotected secret-key packet has no S2K line, a protected one does.
+          protected=$(printf '%s\n' "$ORG_GRADLE_PROJECT_signingInMemoryKey" \
+            | gpg --list-packets 2>/dev/null | grep -c 'S2K')
+          if [[ "$protected" != "0" ]]; then
+            # An unset Actions secret still arrives as an empty variable, so a
+            # non-empty test is the only one that catches it; ${VAR+set} would pass.
+            test -n "$ORG_GRADLE_PROJECT_signingInMemoryKeyPassword" || {
+              echo 'The signing key is passphrase-protected; configure MAVEN_CENTRAL_SIGNING_KEY_PASSWORD.'; exit 1; }
+            echo "Signing key is passphrase-protected."
+          else
+            echo "Signing key has no passphrase."
+          fi
           # The Kotlin signing tasks cannot be serialized into the configuration cache.
           ./gradlew publishToMavenCentral \
             --no-daemon --no-configuration-cache --no-build-cache
