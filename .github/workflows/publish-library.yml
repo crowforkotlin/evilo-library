@@ -153,8 +153,11 @@ jobs:
           # BouncyCastle as "checksum mismatch in checksum of 20 bytes", which reads
           # like corruption. Inspect the armored key instead of assuming: an
           # unprotected secret-key packet has no S2K line, a protected one does.
+          # `grep -c` exits 1 when it counts zero matches, and the runner uses
+          # `set -e`, so a key without an S2K packet would abort with no message.
           protected=$(printf '%s\n' "$ORG_GRADLE_PROJECT_signingInMemoryKey" \
-            | gpg --list-packets 2>/dev/null | grep -c 'S2K')
+            | gpg --list-packets 2>/dev/null | grep -c 'S2K' || true)
+          protected=${protected:-0}
           if [[ "$protected" != "0" ]]; then
             # An unset Actions secret still arrives as an empty variable, so a
             # non-empty test is the only one that catches it; ${VAR+set} would pass.
