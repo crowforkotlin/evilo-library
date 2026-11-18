@@ -82,30 +82,53 @@ plus sources and javadoc JARs, gates the footprint (the free Central tier meters
 monthly bytes and file counts), and only then uploads with
 `publishToMavenCentral`.
 
-Required repository secrets, set once. Run these one at a time and paste the
-value at the prompt; `gh secret set` reads a single value per command, so putting
-it in a `for` loop makes every iteration fight the same terminal.
+Repository secrets, set once. Run these one at a time: `gh secret set` reads a
+single value from the terminal, so a `for` loop makes every iteration fight the
+same prompt.
+
+The account token is mandatory:
 
 ```sh
 gh secret set MAVEN_CENTRAL_USERNAME --repo crowforkotlin/evilo-library
+```
+
+```sh
 gh secret set MAVEN_CENTRAL_PASSWORD --repo crowforkotlin/evilo-library
+```
+
+The signing key is mandatory:
+
+```sh
+gpg --armor --export-secret-keys YOUR_FINGERPRINT \
+  | gh secret set MAVEN_CENTRAL_SIGNING_KEY --repo crowforkotlin/evilo-library
+```
+
+Its passphrase is required only when that key is protected:
+
+```sh
 gh secret set MAVEN_CENTRAL_SIGNING_KEY_PASSWORD --repo crowforkotlin/evilo-library
 ```
 
 Both halves of the Central user token come from Portal -> Account -> Generate
-User Token. For the signing key, export it from your keyring directly so the
-armored key never passes through a paste buffer:
+User Token.
+
+Find the fingerprint for `YOUR_FINGERPRINT` with:
 
 ```sh
-GNUPGHOME="$HOME/.gnupg" gpg --armor --export-secret-keys 0B4189D9794C625F \
-  | gh secret set MAVEN_CENTRAL_SIGNING_KEY --repo crowforkotlin/evilo-library
+gpg --list-secret-keys --keyid-format LONG
 ```
 
-`gnupg` may ask for the key passphrase while exporting. If you omit
-`GNUPGHOME`, an inherited `GNUPGHOME` pointing at a missing directory makes `gpg`
-fail before it reaches your keyring.
+Piping the export straight into `gh` keeps the armored key out of your paste
+buffer. `gpg` may ask for the key passphrase while exporting. An inherited `GNUPGHOME`
+that points at a missing directory makes `gpg` fail before it reaches your
+keyring; unset it or pass `GNUPGHOME="$HOME/.gnupg"` explicitly.
 
-Confirm all four are present:
+Whether `MAVEN_CENTRAL_SIGNING_KEY_PASSWORD` is required depends on the key. A
+key with an `S2K` protection packet needs it; an unprotected key must not have it
+set. The publish job inspects the armored key and fails with a named message
+either way, so a wrong pairing never reaches the upload step.
+
+Confirm they are present:
 
 ```sh
 gh secret list --repo crowforkotlin/evilo-library
