@@ -1,9 +1,10 @@
 package crow.evilo.plugin.api
 
-fun ProtocolRequirement.incompatibility(host: HostDescriptor): String? = when {
-    major != host.protocolMajor -> "Plugin protocol $major is not supported; host protocol is ${host.protocolMajor}."
-    minimumMinor !in 0..host.protocolMinor -> "Plugin requires protocol $major.$minimumMinor or newer."
-    !host.capabilities.containsAll(requiredCapabilities) ->
-        "Missing host capabilities: ${(requiredCapabilities - host.capabilities).sorted().joinToString()}."
-    else -> null
+/**
+ * Reports why this host cannot run a plugin declaring [required] capabilities.
+ * Returns null when every requirement is satisfied.
+ */
+fun hostIncompatibility(required: Set<String>, host: HostDescriptor): String? {
+    val missing = required - host.capabilities
+    return if (missing.isEmpty()) null else "Missing host capabilities: ${missing.sorted().joinToString()}."
 }

@@ -39,26 +39,17 @@ interface EviloHostService : WasmlineService {
     fun listKeys(prefix: String): String
 }
 
-@Serializable
-data class ProtocolRequirement(
-    val major: Int = PLUGIN_PROTOCOL_MAJOR,
-    val minimumMinor: Int = PLUGIN_PROTOCOL_MINOR,
-    val requiredCapabilities: Set<String> = setOf(HOST_MEDIA_CAPABILITY),
-    val optionalCapabilities: Set<String> = emptySet(),
-)
-
-@Serializable
-data class HttpAccess(
-    val origins: Set<String> = emptySet(),
-    val pathPrefixes: Set<String> = setOf("/"),
-    val methods: Set<String> = setOf("GET"),
-    val headers: Set<String> = setOf("accept", "user-agent"),
-)
-
+/**
+ * What a plugin may reach. Origins are the whole network model: once an origin is
+ * approved the host forwards whatever method, path, and headers the plugin asks for.
+ * Whether a server accepts that request is the server's decision, not the host's.
+ *
+ * An entry is a scheme plus a host, optionally with one leading wildcard label.
+ * A single asterisk as the whole entry approves every origin.
+ */
 @Serializable
 data class PluginPermissions(
-    val api: HttpAccess = HttpAccess(),
-    val media: HttpAccess = HttpAccess(),
+    val origins: Set<String> = emptySet(),
     val storage: Boolean = false,
 )
 
@@ -70,7 +61,6 @@ data class PluginDescriptor(
     val versionCode: Long,
     val kinds: Set<MediaKind>,
     val languages: List<String>,
-    val protocol: ProtocolRequirement = ProtocolRequirement(),
     val permissions: PluginPermissions = PluginPermissions(),
     val extensions: Map<String, String> = emptyMap(),
 )

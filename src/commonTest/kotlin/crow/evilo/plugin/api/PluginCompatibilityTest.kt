@@ -9,25 +9,14 @@ class PluginCompatibilityTest {
     private val host = HostDescriptor("1.0.0", 1, capabilities = setOf(HOST_MEDIA_CAPABILITY, HOST_HTTP_CAPABILITY))
 
     @Test
-    fun matchingProtocolAndRequiredCapabilitiesAreAccepted() {
-        assertNull(ProtocolRequirement(requiredCapabilities = host.capabilities).incompatibility(host))
+    fun everyDeclaredCapabilityIsPresentOnTheHost() {
+        assertNull(hostIncompatibility(host.capabilities, host))
     }
 
     @Test
-    fun anotherMajorOrANewerRequiredMinorIsRejected() {
-        assertNotNull(ProtocolRequirement(major = host.protocolMajor + 1).incompatibility(host))
-        assertNotNull(ProtocolRequirement(minimumMinor = host.protocolMinor + 1).incompatibility(host))
-        assertNotNull(ProtocolRequirement(minimumMinor = -1).incompatibility(host))
-    }
-
-    @Test
-    fun missingRequiredCapabilityIsNamedInTheFailure() {
-        val reason = ProtocolRequirement(requiredCapabilities = setOf(HOST_STORAGE_CAPABILITY)).incompatibility(host)
-        assertTrue(reason.orEmpty().contains(HOST_STORAGE_CAPABILITY))
-    }
-
-    @Test
-    fun unknownOptionalCapabilityDoesNotPreventLoading() {
-        assertNull(ProtocolRequirement(optionalCapabilities = setOf("reader.bookmarks.v1")).incompatibility(host))
+    fun missingCapabilityIsNamedInTheFailure() {
+        val reason = hostIncompatibility(setOf(HOST_STORAGE_CAPABILITY), host)
+        assertNotNull(reason)
+        assertTrue(reason.contains(HOST_STORAGE_CAPABILITY))
     }
 }
