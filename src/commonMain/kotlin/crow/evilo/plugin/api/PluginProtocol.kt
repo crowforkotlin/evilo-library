@@ -39,20 +39,6 @@ interface EviloHostService : WasmlineService {
     fun listKeys(prefix: String): String
 }
 
-/**
- * What a plugin may reach. Origins are the whole network model: once an origin is
- * approved the host forwards whatever method, path, and headers the plugin asks for.
- * Whether a server accepts that request is the server's decision, not the host's.
- *
- * An entry is a scheme plus a host, optionally with one leading wildcard label.
- * A single asterisk as the whole entry approves every origin.
- */
-@Serializable
-data class PluginPermissions(
-    val origins: Set<String> = emptySet(),
-    val storage: Boolean = false,
-)
-
 @Serializable
 data class PluginDescriptor(
     val id: String,
@@ -61,7 +47,6 @@ data class PluginDescriptor(
     val versionCode: Long,
     val kinds: Set<MediaKind>,
     val languages: List<String>,
-    val permissions: PluginPermissions = PluginPermissions(),
     val extensions: Map<String, String> = emptyMap(),
 )
 

@@ -70,9 +70,9 @@ at this directory instead of a published version:
 ```sh
 git switch main
 ./.github/scripts/bump_version.py z
-git add -A && git commit -m "chore(release): 1.0.1"
-git tag library-v1.0.1
-git push origin main library-v1.0.1
+git add -A && git commit -m "chore(release): 2.0.0"
+git tag library-v2.0.0
+git push origin main library-v2.0.0
 ```
 
 `.github/workflows/publish-library.yml` checks that the tag matches the version
