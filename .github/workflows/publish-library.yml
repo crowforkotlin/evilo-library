@@ -151,10 +151,11 @@ jobs:
           test -n "$ORG_GRADLE_PROJECT_signingInMemoryKey" || { echo 'Configure MAVEN_CENTRAL_SIGNING_KEY.'; exit 1; }
           # A passphrase-protected key without its secret fails deep inside BouncyCastle
           # as "checksum mismatch in checksum of 20 bytes", which reads like corruption.
-          # An unset secret and an intentionally empty passphrase need different values,
-          # so require the variable to be defined rather than non-empty.
-          test -n "${ORG_GRADLE_PROJECT_signingInMemoryKeyPassword+set}" || {
-            echo 'Configure MAVEN_CENTRAL_SIGNING_KEY_PASSWORD (empty if the key has no passphrase).'; exit 1; }
+          # This repository's key has a passphrase, so require a non-empty value here.
+          # Note an unset Actions secret still arrives as an empty variable, so `-n` is
+          # the only test that catches it; `${VAR+set}` would pass.
+          test -n "$ORG_GRADLE_PROJECT_signingInMemoryKeyPassword" || {
+            echo 'Configure MAVEN_CENTRAL_SIGNING_KEY_PASSWORD.'; exit 1; }
           # The Kotlin signing tasks cannot be serialized into the configuration cache.
           ./gradlew publishToMavenCentral \
             --no-daemon --no-configuration-cache --no-build-cache
