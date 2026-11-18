@@ -160,7 +160,28 @@ jobs:
             # non-empty test is the only one that catches it; ${VAR+set} would pass.
             test -n "$ORG_GRADLE_PROJECT_signingInMemoryKeyPassword" || {
               echo 'The signing key is passphrase-protected; configure MAVEN_CENTRAL_SIGNING_KEY_PASSWORD.'; exit 1; }
-            echo "Signing key is passphrase-protected."
+            echo "Signing key is passphrase-protected; verifying the passphrase."
+            # Prove the pair before running a multi-minute build: an incorrect
+            # passphrase otherwise surfaces later as BouncyCastle's opaque
+            # "checksum mismatch in checksum of 20 bytes".
+            probe=$(mktemp -d)
+            chmod 700 "$probe"
+            # Import ignores the passphrase; exporting the secret key is the real proof.
+            printf '%s\n' "$ORG_GRADLE_PROJECT_signingInMemoryKey" \
+              | GNUPGHOME="$probe" gpg --batch --quiet --import 2>/dev/null
+            fingerprint=$(GNUPGHOME="$probe" gpg --batch --with-colons --list-secret-keys 2>/dev/null \
+              | awk -F: '/^fpr/{print $10; exit}')
+            ok=false
+            if [[ -n "$fingerprint" ]] && GNUPGHOME="$probe" gpg --batch --pinentry-mode loopback \
+                 --passphrase "$ORG_GRADLE_PROJECT_signingInMemoryKeyPassword" \
+                 --armor --export-secret-keys "$fingerprint" >/dev/null 2>&1; then
+              ok=true
+            fi
+            rm -rf "$probe"
+            [[ "$ok" == "true" ]] || {
+              echo 'MAVEN_CENTRAL_SIGNING_KEY_PASSWORD does not unlock MAVEN_CENTRAL_SIGNING_KEY.'
+              echo 'Re-set the password secret, or upload an unprotected release key.'; exit 1; }
+            echo "Passphrase unlocks the signing key."
           else
             echo "Signing key has no passphrase."
           fi
