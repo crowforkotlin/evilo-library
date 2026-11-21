@@ -97,7 +97,6 @@ configure<MavenPublishBaseExtension> {
         developers {
             developer {
                 id.set("crowforkotlin")
-                name.set("wuya")
             }
         }
         scm {
