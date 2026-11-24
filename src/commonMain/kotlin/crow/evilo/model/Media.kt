@@ -28,6 +28,7 @@ data class MediaItem(
     val authors: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
     val extensions: Map<String, String> = emptyMap(),
+    val accessRequirements: Set<String> = emptySet(),
 )
 
 @Serializable

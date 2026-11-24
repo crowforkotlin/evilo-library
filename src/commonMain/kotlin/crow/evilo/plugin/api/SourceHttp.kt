@@ -8,6 +8,7 @@ data class SourceRequest(
     val method: String = "GET",
     val headers: Map<String, String> = emptyMap(),
     val body: String? = null,
+    val accessRequirementId: String? = null,
 )
 
 @Serializable

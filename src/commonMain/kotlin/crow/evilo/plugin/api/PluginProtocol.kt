@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 const val PLUGIN_PROTOCOL_MAJOR = 1
-const val PLUGIN_PROTOCOL_MINOR = 0
+const val PLUGIN_PROTOCOL_MINOR = 1
 const val HOST_HTTP_CAPABILITY = "http.request.v1"
 const val HOST_STORAGE_CAPABILITY = "storage.kv.v1"
 const val HOST_MEDIA_CAPABILITY = "media.catalog.v1"
@@ -48,6 +48,8 @@ data class PluginDescriptor(
     val kinds: Set<MediaKind>,
     val languages: List<String>,
     val extensions: Map<String, String> = emptyMap(),
+    val configuration: PluginConfiguration = PluginConfiguration(),
+    val protocol: ProtocolRequirement = ProtocolRequirement(),
 )
 
 @Serializable
@@ -79,6 +81,8 @@ data class PluginOperation(
     val item: MediaItem? = null,
     val chapter: MediaChapter? = null,
     val extensions: Map<String, String> = emptyMap(),
+    val filters: Map<String, PluginFilterValue> = emptyMap(),
+    val credentialRefs: Map<String, PluginCredentialReference> = emptyMap(),
 )
 
 @Serializable
@@ -89,6 +93,7 @@ data class PluginResult(
     val chapters: List<MediaChapter> = emptyList(),
     val content: MediaContent? = null,
     val extensions: Map<String, String> = emptyMap(),
+    val access: List<PluginAccessState> = emptyList(),
 )
 
 @Serializable

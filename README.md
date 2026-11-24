@@ -8,7 +8,7 @@ Published to Maven Central as `io.github.crowforkotlin.evilo:evilo-library`.
 
 ```kotlin
 dependencies {
-    api("io.github.crowforkotlin.evilo:evilo-library:2.0.0")
+    api("io.github.crowforkotlin.evilo:evilo-library:2.0.1")
 }
 ```
 
@@ -28,6 +28,49 @@ dependencies {
 The protocol is JSON envelopes over generated Wasmline bridge calls, so additive
 fields stay independent of the bridge ABI. Unknown optional fields are tolerated;
 `ProtocolRequirement.incompatibility` decides whether a host can load a plugin.
+
+## Optional filter and access contract
+
+SDK source version 2.0.1 adds protocol minor 1; it is not a publication result.
+`EviloPluginService.describe/start/resume` and operation enum cases remain unchanged.
+Descriptor `configuration` and operation `filters` default to empty. `protocol`
+defaults to major 1, minimum minor 0, required `media.catalog.v1`; optional features
+do not raise the minimum minor automatically.
+
+`PluginConfiguration.groups` contains bounded CHOICE (single/multiple), TOGGLE,
+RANGE, and TEXT fields. Labels contain a fallback and localized strings; selections
+use `PluginFilterValue`, not extension strings. `validateConfiguration` rejects
+schemas over 12 KiB, more than 8 groups/32 fields/64 options per field, invalid
+defaults and forward/cyclic dependencies. `resolvePluginFilters` validates values,
+materializes defaults, and omits disabled/unknown optional controls. Unsupported
+required controls fail. `prunePluginFilters` discards invalid non-secret selections
+after schema replacement. Optional fields without defaults remain unset until an
+explicit edit. Selections fit 8 KiB and provider-scoped values alone cross the guest
+bridge; app-local controls remain host-owned. Plugin LOCAL fields require an explicit
+`localMetadataKey` binding to a bounded non-secret `MediaItem.extensions` key.
+The host matches choice IDs exactly, text by substring, toggle as boolean equality,
+and range as numeric equality; no title/tag/ID meaning is inferred. Required LOCAL
+fields without binding fail; optional unbound LOCAL fields are omitted.
+
+Declare `configuration.filters.v1` as optional when the default operation works
+without filters. Required new capabilities or minimum minor 1 need a catalog
+`minimumHostVersionCode` of at least 2 because older hosts ignore added JSON fields.
+The catalog protocol, signed descriptor protocol, and runtime descriptor protocol
+must match; the full runtime configuration must match its verified signed descriptor.
+
+Access requirements, actions, item locks, and result states are typed separately.
+The host supports only explicit SESSION_TOKEN actions with exact HTTPS origin,
+method and path-prefix grants under `access.session-token.v1`. An opaque
+`PluginCredentialReference` is session-only, publisher/plugin/account-bound, and
+is never a token. Operations carry references; a continuation `SourceRequest`
+selects `accessRequirementId` and the host inserts the token only after grant
+validation. Images/streams do not receive host credentials. Tokens are never passed
+to guest calls or normal plugin KV; provider responses containing the literal
+host-held token are refused before forwarding. Closing/revoking clears the in-memory
+reference. This does not provide secure persistence, provider login, challenge
+completion, dynamic options, or a new configuration service. Unsupported actions
+must remain explicitly unsupported; do not describe a complete account flow from
+these models alone.
 
 ## Versioning
 
